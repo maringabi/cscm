@@ -117,7 +117,18 @@ int eval_expr(char **tokens, int num_tokens, int *pos) {
       while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
         res -= eval_expr(tokens, num_tokens, pos);
       }
-    } else {
+    } else if(strcmp(op, "*") == 0) {
+      res = eval_expr(tokens, num_tokens, pos);
+      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
+        res *= eval_expr(tokens, num_tokens, pos);
+      }
+    } else if(strcmp(op, "/") == 0) {
+      res = eval_expr(tokens, num_tokens, pos);
+      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
+        res /= eval_expr(tokens, num_tokens, pos);
+      }
+    }
+    else {
       fprintf(stderr, "Unsupported operator: %s\n", op);
       exit(1);
     }

@@ -12,8 +12,8 @@
 
 - [x] +
 - [x] -
-- [ ] *
-- [ ] /
+- [x] *
+- [x] /
 
 ### Supported arguments
 
