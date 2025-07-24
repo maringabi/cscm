@@ -14,6 +14,7 @@
 - [x] -
 - [x] *
 - [x] /
+- [x] define
 
 ### Supported arguments
 
