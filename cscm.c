@@ -10,6 +10,7 @@
 struct tokenizer {
   char **tokens; /* array of token */
   int len;       /* number of tokens */
+  int pos;       /* current string position */
 };
 
 /* Entry struct used to store environment variables */
@@ -27,6 +28,7 @@ struct interpreter {
 void initTokenizer(struct tokenizer *t) {
   t->tokens = NULL;
   t->len = 0;
+  t->pos = 0;
 }
 
 void initInterpreter(struct interpreter *i) {
@@ -139,39 +141,39 @@ void tokenize(struct tokenizer *t, char **str) {
 }
 
 /* recursive eval expression function to evaluate s-expr */
-int eval_expr(struct interpreter *i, struct tokenizer *t, int *pos) {
+int evalExpr(struct interpreter *i, struct tokenizer *t) {
   /* begging of s-expr */
-  if(strcmp(t->tokens[*pos], "(") == 0) {
-    (*pos)++; /* skip '(' */
+  if(strcmp(t->tokens[t->pos], "(") == 0) {
+    t->pos++; /* skip '(' */
 
     /* s-expr operation */
-    const char *op = t->tokens[(*pos)++];
+    const char *op = t->tokens[t->pos++];
 
     if(strcmp(op, "+") == 0) {
       i->result = 0;
-      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        i->result += eval_expr(i, t, pos);
+      while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
+        i->result += evalExpr(i, t);
       }
     } else if(strcmp(op, "-") == 0) {
-      i->result = eval_expr(i, t, pos);
-      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        i->result -= eval_expr(i, t, pos);
+      i->result = evalExpr(i, t);
+      while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
+        i->result -= evalExpr(i, t);
       }
     } else if(strcmp(op, "*") == 0) {
-      i->result = eval_expr(i, t, pos);
-      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        i->result *= eval_expr(i, t, pos);
+      i->result = evalExpr(i, t);
+      while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
+        i->result *= evalExpr(i, t);
       }
     } else if(strcmp(op, "/") == 0) {
-      i->result = eval_expr(i, t, pos);
-      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        i->result /= eval_expr(i, t, pos);
+      i->result = evalExpr(i, t);
+      while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
+        i->result /= evalExpr(i, t);
       }
     } else if(strcmp(op, "define") == 0) {
-      const char *sym = t->tokens[(*pos)++]; // get variable name
-      int val = atoi(t->tokens[(*pos)++]); // get variable value
+      const char *sym = t->tokens[t->pos++]; // get variable name
+      int val = atoi(t->tokens[t->pos++]); // get variable value
       define_variable(i, sym, val); /* store variable in global environment */
-      if(strcmp(t->tokens[(*pos)], ")") != 0) {
+      if(strcmp(t->tokens[t->pos], ")") != 0) {
         perror("Expected ')'\n");
         exit(1);
       }
@@ -180,34 +182,34 @@ int eval_expr(struct interpreter *i, struct tokenizer *t, int *pos) {
       exit(1);
     }
 
-    if(*pos >= t->len || strcmp(t->tokens[*pos], ")") != 0) {
+    if(t->pos >= t->len || strcmp(t->tokens[t->pos], ")") != 0) {
       perror("Expected ')'\n");
       exit(1);
     }
     
     /* end of s-expr */
-    (*pos)++; /* skip ')' */
+    t->pos++; /* skip ')' */
     return i->result;
   }
 
   /* base case: s-expr arguments */
   else {
     char *endptr;
-    int val = strtol(t->tokens[*pos], &endptr, 10);
+    int val = strtol(t->tokens[t->pos], &endptr, 10);
     if(*endptr != '\0') { // if token is a symbol
-      val = lookup_variable(i, t->tokens[*pos]);
+      val = lookup_variable(i, t->tokens[t->pos]);
     } else {
-      val = atoi(t->tokens[*pos]);
+      val = atoi(t->tokens[t->pos]);
     }
-    (*pos)++;
+    t->pos++;
     return val;
   }
 }
 
-/* eval function */
-int eval(struct interpreter *i, struct tokenizer *t) {
-  int pos = 0;
-  return eval_expr(i, t, &pos);
+/* EVAL */
+void eval(struct interpreter *i, struct tokenizer *t) {
+  t->pos = 0; /* reset tokenizer position for the new line */
+  evalExpr(i, t);
 }
 
 int main(int argc , char *argv[]) {
