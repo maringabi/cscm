@@ -25,19 +25,19 @@ struct interpreter {
   int result;              /* result after evaluation */
 };
 
-void initTokenizer(struct tokenizer *t) {
+void init_tokenizer(struct tokenizer *t) {
   t->tokens = NULL;
   t->len = 0;
   t->pos = 0;
 }
 
-void initInterpreter(struct interpreter *i) {
+void init_interpreter(struct interpreter *i) {
   i->env = NULL;
   i->result = 0;
 }
 
 /* Store variable with the name sym and value val */
-void defineVariable(struct interpreter *i, const char *sym, int val) {
+void define_variable(struct interpreter *i, const char *sym, int val) {
   struct environment *entry = malloc(sizeof(struct environment));
   entry->sym = strdup(sym);
   entry->val = val;
@@ -46,7 +46,7 @@ void defineVariable(struct interpreter *i, const char *sym, int val) {
 }
 
 /* Lookup variable with the name 'sym' in interpreter global environment */
-int lookupVariable(struct interpreter *i, const char *sym) {
+int lookup_variable(struct interpreter *i, const char *sym) {
   struct environment *current = i->env;
   while(strcmp(current->sym, sym)) {
     current  = current->next;
@@ -55,7 +55,7 @@ int lookupVariable(struct interpreter *i, const char *sym) {
 }
 
 /* put spaces around parents useful later for tokens spliting with space delimier */
-char *replaceParens(char *str) {
+char *replace_parens(char *str) {
   size_t len = strlen(str);
   size_t extra_space = 0;
 
@@ -89,7 +89,7 @@ char *replaceParens(char *str) {
 }
 
 /* verify if string is a valid token */
-int validToken(const char *token) {
+int valid_token(const char *token) {
   if(*token == '\0' || token == NULL) {
     return 0;
   }
@@ -113,10 +113,10 @@ void tokenize(struct tokenizer *t, char **str) {
     exit(1);
   }
 
-  char *s = replaceParens(*str);
+  char *s = replace_parens(*str);
   size_t j = 0; /* tokens array iterator */
   while ((token = strsep(&s, " ")) != NULL) {
-    if(validToken(token)) {
+    if(valid_token(token)) {
       /* when to increase tokens_len? */
       if(j >= tokens_len) {
         tokens_len *= 2;
@@ -139,7 +139,7 @@ void tokenize(struct tokenizer *t, char **str) {
 }
 
 /* recursive eval expression function to evaluate s-expr */
-int evalExpr(struct interpreter *i, struct tokenizer *t) {
+int eval_expr(struct interpreter *i, struct tokenizer *t) {
   /* begging of s-expr */
   if(strcmp(t->tokens[t->pos], "(") == 0) {
     t->pos++; /* skip '(' */
@@ -147,33 +147,33 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
     /* s-expr operation */
     const char *op = t->tokens[t->pos++];
     /* We cannot use 'i->result' because interpreter structure is passed around at
-       every 'evalExpr' call and the result is remember from previous 'evalExpr' calls.
-       We need a new res at every 'evalExpr' call. Final result here is stored in 'eval'. */
+       every 'eval_expr' call and the result is remember from previous 'eval_expr' calls.
+       We need a new res at every 'eval_expr' call. Final result here is stored in 'eval'. */
     int res;
     if(strcmp(op, "+") == 0) {
-      res = evalExpr(i, t);
+      res = eval_expr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        res += evalExpr(i, t);
+        res += eval_expr(i, t);
       }
     } else if(strcmp(op, "-") == 0) {
-      res = evalExpr(i, t);
+      res = eval_expr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        res -= evalExpr(i, t);
+        res -= eval_expr(i, t);
       }
     } else if(strcmp(op, "*") == 0) {
-      res = evalExpr(i, t);
+      res = eval_expr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        res *= evalExpr(i, t);
+        res *= eval_expr(i, t);
       }
     } else if(strcmp(op, "/") == 0) {
-      res = evalExpr(i, t);
+      res = eval_expr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        res /= evalExpr(i, t);
+        res /= eval_expr(i, t);
       }
     } else if(strcmp(op, "define") == 0) {
       const char *sym = t->tokens[t->pos++]; // get variable name
       int val = atoi(t->tokens[t->pos++]); // get variable value
-      defineVariable(i, sym, val); /* store variable in global environment */
+      define_variable(i, sym, val); /* store variable in global environment */
       if(strcmp(t->tokens[t->pos], ")") != 0) {
         perror("Expected ')'\n");
         exit(1);
@@ -198,7 +198,7 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
     char *endptr;
     int val = strtol(t->tokens[t->pos], &endptr, 10);
     if(*endptr != '\0') { /* if token is a symbol */
-      val = lookupVariable(i, t->tokens[t->pos]);
+      val = lookup_variable(i, t->tokens[t->pos]);
     } else {
       val = atoi(t->tokens[t->pos]);
     }
@@ -210,7 +210,7 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
 /* EVAL */
 void eval(struct interpreter *i, struct tokenizer *t) {
   t->pos = 0; /* reset tokenizer position for the new line */
-  i->result = evalExpr(i, t);
+  i->result = eval_expr(i, t);
 }
 
 int main(int argc , char *argv[]) {
@@ -220,8 +220,8 @@ int main(int argc , char *argv[]) {
   struct tokenizer t;
   struct interpreter i;
 
-  initTokenizer(&t);
-  initInterpreter(&i);
+  init_tokenizer(&t);
+  init_interpreter(&i);
 
   while(1) {
     printf("cscm> "); fflush(stdout); /* Prompt */
