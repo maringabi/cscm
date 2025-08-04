@@ -37,7 +37,7 @@ void initInterpreter(struct interpreter *i) {
 }
 
 /* Store variable with the name sym and value val */
-void define_variable(struct interpreter *i, const char *sym, int val) {
+void defineVariable(struct interpreter *i, const char *sym, int val) {
   struct environment *entry = malloc(sizeof(struct environment));
   entry->sym = strdup(sym);
   entry->val = val;
@@ -46,7 +46,7 @@ void define_variable(struct interpreter *i, const char *sym, int val) {
 }
 
 /* Lookup variable with the name 'sym' in interpreter global environment */
-int lookup_variable(struct interpreter *i, const char *sym) {
+int lookupVariable(struct interpreter *i, const char *sym) {
   struct environment *current = i->env;
   while(strcmp(current->sym, sym)) {
     current  = current->next;
@@ -55,7 +55,7 @@ int lookup_variable(struct interpreter *i, const char *sym) {
 }
 
 /* put spaces around parents useful later for tokens spliting with space delimier */
-char *replace_parens(char *str) {
+char *replaceParens(char *str) {
   size_t len = strlen(str);
   size_t extra_space = 0;
 
@@ -89,18 +89,16 @@ char *replace_parens(char *str) {
 }
 
 /* verify if string is a valid token */
-int is_valid_token(const char *token) {
+int validToken(const char *token) {
   if(*token == '\0' || token == NULL) {
     return 0;
   }
-
   /* if token has any character that is not space return 1 */
   for(const char *p = token; *p; ++p) {
     if(!isspace(*p)) {
       return 1;
     }
   }
-  
   return 0;
 }
 
@@ -115,10 +113,10 @@ void tokenize(struct tokenizer *t, char **str) {
     exit(1);
   }
 
-  char *s = replace_parens(*str);
+  char *s = replaceParens(*str);
   size_t j = 0; /* tokens array iterator */
   while ((token = strsep(&s, " ")) != NULL) {
-    if(is_valid_token(token)) {
+    if(validToken(token)) {
       /* when to increase tokens_len? */
       if(j >= tokens_len) {
         tokens_len *= 2;
@@ -172,7 +170,7 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
     } else if(strcmp(op, "define") == 0) {
       const char *sym = t->tokens[t->pos++]; // get variable name
       int val = atoi(t->tokens[t->pos++]); // get variable value
-      define_variable(i, sym, val); /* store variable in global environment */
+      defineVariable(i, sym, val); /* store variable in global environment */
       if(strcmp(t->tokens[t->pos], ")") != 0) {
         perror("Expected ')'\n");
         exit(1);
@@ -196,8 +194,8 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
   else {
     char *endptr;
     int val = strtol(t->tokens[t->pos], &endptr, 10);
-    if(*endptr != '\0') { // if token is a symbol
-      val = lookup_variable(i, t->tokens[t->pos]);
+    if(*endptr != '\0') { /* if token is a symbol */
+      val = lookupVariable(i, t->tokens[t->pos]);
     } else {
       val = atoi(t->tokens[t->pos]);
     }
