@@ -146,26 +146,29 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
 
     /* s-expr operation */
     const char *op = t->tokens[t->pos++];
-
+    /* We cannot use 'i->result' because interpreter structure is passed around at
+       every 'evalExpr' call and the result is remember from previous 'evalExpr' calls.
+       We need a new res at every 'evalExpr' call. Final result here is stored in 'eval'. */
+    int res;
     if(strcmp(op, "+") == 0) {
-      i->result = 0;
+      res = evalExpr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        i->result += evalExpr(i, t);
+        res += evalExpr(i, t);
       }
     } else if(strcmp(op, "-") == 0) {
-      i->result = evalExpr(i, t);
+      res = evalExpr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        i->result -= evalExpr(i, t);
+        res -= evalExpr(i, t);
       }
     } else if(strcmp(op, "*") == 0) {
-      i->result = evalExpr(i, t);
+      res = evalExpr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        i->result *= evalExpr(i, t);
+        res *= evalExpr(i, t);
       }
     } else if(strcmp(op, "/") == 0) {
-      i->result = evalExpr(i, t);
+      res = evalExpr(i, t);
       while(t->pos < t->len && strcmp(t->tokens[t->pos], ")") != 0) {
-        i->result /= evalExpr(i, t);
+        res /= evalExpr(i, t);
       }
     } else if(strcmp(op, "define") == 0) {
       const char *sym = t->tokens[t->pos++]; // get variable name
@@ -187,7 +190,7 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
     
     /* end of s-expr */
     t->pos++; /* skip ')' */
-    return i->result;
+    return res;
   }
 
   /* base case: s-expr arguments */
@@ -207,7 +210,7 @@ int evalExpr(struct interpreter *i, struct tokenizer *t) {
 /* EVAL */
 void eval(struct interpreter *i, struct tokenizer *t) {
   t->pos = 0; /* reset tokenizer position for the new line */
-  evalExpr(i, t);
+  i->result = evalExpr(i, t);
 }
 
 int main(int argc , char *argv[]) {
@@ -227,6 +230,11 @@ int main(int argc , char *argv[]) {
     tokenize(&t, &line);
     eval(&i, &t);
     printf("%d\n", i.result);
+
+    /* reset tokenizer */
+    free(t.tokens);
+    t.len = 0;
+    t.pos = 0;
   }
   return 0;
 }
