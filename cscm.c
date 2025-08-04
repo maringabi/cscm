@@ -9,43 +9,50 @@
 /* Structure reprezenting the tokenizer where each token is stored*/
 struct tokenizer {
   char **tokens; /* array of token */
-  int len; /* number of tokens */
+  int len;       /* number of tokens */
 };
 
 /* Entry struct used to store environment variables */
-struct  envEntry {
-  char *sym;             // variable name
-  int val;               // variable value
-  struct envEntry *next; // pointer to next environment entry
+struct  environment {
+  char *sym;                 /* variable name */
+  int val;                   /* variable value */
+  struct environment *next;  /* pointer to next environment entry */
 };
 
-struct envEntry *global_env = NULL;
+struct interpreter {
+  struct environment *env; /* interpreter global environment */
+  int result;              /* result after evaluation */
+};
 
 void initTokenizer(struct tokenizer *t) {
   t->tokens = NULL;
   t->len = 0;
 }
 
-/* Store variable with the name sym and value val */
-void define_variable(const char *sym, int val) {
-  struct envEntry *entry = malloc(sizeof(struct envEntry));
-  entry->sym = strdup(sym);
-  entry->val = val;
-  entry->next = global_env;
-  global_env = entry;
+void initInterpreter(struct interpreter *i) {
+  i->env = NULL;
+  i->result = 0;
 }
 
-int lookup_variable(const char *sym) {
-  struct envEntry *current = global_env;
+/* Store variable with the name sym and value val */
+void define_variable(struct interpreter *i, const char *sym, int val) {
+  struct environment *entry = malloc(sizeof(struct environment));
+  entry->sym = strdup(sym);
+  entry->val = val;
+  entry->next = i->env;
+  i->env = entry;
+}
+
+/* Lookup variable with the name 'sym' in interpreter global environment */
+int lookup_variable(struct interpreter *i, const char *sym) {
+  struct environment *current = i->env;
   while(strcmp(current->sym, sym)) {
     current  = current->next;
   }
   return current->val;
 }
 
-/* put spaces around parents '(' and ')'
- * useful later for tokens spliting with space delimier
- */
+/* put spaces around parents useful later for tokens spliting with space delimier */
 char *replace_parens(char *str) {
   size_t len = strlen(str);
   size_t extra_space = 0;
@@ -132,39 +139,38 @@ void tokenize(struct tokenizer *t, char **str) {
 }
 
 /* recursive eval expression function to evaluate s-expr */
-int eval_expr(struct tokenizer *t, int *pos) {
+int eval_expr(struct interpreter *i, struct tokenizer *t, int *pos) {
   /* begging of s-expr */
   if(strcmp(t->tokens[*pos], "(") == 0) {
     (*pos)++; /* skip '(' */
 
     /* s-expr operation */
     const char *op = t->tokens[(*pos)++];
-    int res;
 
     if(strcmp(op, "+") == 0) {
-      res = 0;
+      i->result = 0;
       while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        res += eval_expr(t, pos);
+        i->result += eval_expr(i, t, pos);
       }
     } else if(strcmp(op, "-") == 0) {
-      res = eval_expr(t, pos);
+      i->result = eval_expr(i, t, pos);
       while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        res -= eval_expr(t, pos);
+        i->result -= eval_expr(i, t, pos);
       }
     } else if(strcmp(op, "*") == 0) {
-      res = eval_expr(t, pos);
+      i->result = eval_expr(i, t, pos);
       while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        res *= eval_expr(t, pos);
+        i->result *= eval_expr(i, t, pos);
       }
     } else if(strcmp(op, "/") == 0) {
-      res = eval_expr(t, pos);
+      i->result = eval_expr(i, t, pos);
       while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
-        res /= eval_expr(t, pos);
+        i->result /= eval_expr(i, t, pos);
       }
     } else if(strcmp(op, "define") == 0) {
       const char *sym = t->tokens[(*pos)++]; // get variable name
       int val = atoi(t->tokens[(*pos)++]); // get variable value
-      define_variable(sym, val); // store variable in global environment
+      define_variable(i, sym, val); /* store variable in global environment */
       if(strcmp(t->tokens[(*pos)], ")") != 0) {
         perror("Expected ')'\n");
         exit(1);
@@ -181,7 +187,7 @@ int eval_expr(struct tokenizer *t, int *pos) {
     
     /* end of s-expr */
     (*pos)++; /* skip ')' */
-    return res;
+    return i->result;
   }
 
   /* base case: s-expr arguments */
@@ -189,7 +195,7 @@ int eval_expr(struct tokenizer *t, int *pos) {
     char *endptr;
     int val = strtol(t->tokens[*pos], &endptr, 10);
     if(*endptr != '\0') { // if token is a symbol
-      val = lookup_variable(t->tokens[*pos]);
+      val = lookup_variable(i, t->tokens[*pos]);
     } else {
       val = atoi(t->tokens[*pos]);
     }
@@ -199,9 +205,9 @@ int eval_expr(struct tokenizer *t, int *pos) {
 }
 
 /* eval function */
-int eval(struct tokenizer *t) {
+int eval(struct interpreter *i, struct tokenizer *t) {
   int pos = 0;
-  return eval_expr(t, &pos);
+  return eval_expr(i, t, &pos);
 }
 
 int main(int argc , char *argv[]) {
@@ -209,17 +215,18 @@ int main(int argc , char *argv[]) {
   size_t linecap = 0;
   ssize_t linelen;
   struct tokenizer t;
-  int res = 0;
+  struct interpreter i;
 
   initTokenizer(&t);
+  initInterpreter(&i);
 
   while(1) {
     printf("cscm> "); fflush(stdout); /* Prompt */
     linelen = getline(&line, &linecap, stdin);
     if(linelen <= 0) break; /* if we don't have any character or and error break */
     tokenize(&t, &line);
-    res = eval(&t);
-    printf("%d\n", res);
+    eval(&i, &t);
+    printf("%d\n", i.result);
   }
   return 0;
 }
