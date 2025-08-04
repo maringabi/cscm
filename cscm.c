@@ -6,18 +6,29 @@
 #include <ctype.h>
 #include <string.h>
 
+/* Structure reprezenting the tokenizer where each token is stored*/
+struct tokenizer {
+  char **tokens; /* array of token */
+  int len; /* number of tokens */
+};
+
 /* Entry struct used to store environment variables */
-typedef struct  EnvEntry {
+struct  envEntry {
   char *sym;             // variable name
   int val;               // variable value
-  struct EnvEntry *next; // pointer to next environment entry
-} EnvEntry;
+  struct envEntry *next; // pointer to next environment entry
+};
 
-EnvEntry *global_env = NULL;
+struct envEntry *global_env = NULL;
+
+void initTokenizer(struct tokenizer *t) {
+  t->tokens = NULL;
+  t->len = 0;
+}
 
 /* Store variable with the name sym and value val */
 void define_variable(const char *sym, int val) {
-  EnvEntry *entry = malloc(sizeof(EnvEntry));
+  struct envEntry *entry = malloc(sizeof(struct envEntry));
   entry->sym = strdup(sym);
   entry->val = val;
   entry->next = global_env;
@@ -25,7 +36,7 @@ void define_variable(const char *sym, int val) {
 }
 
 int lookup_variable(const char *sym) {
-  EnvEntry *current = global_env;
+  struct envEntry *current = global_env;
   while(strcmp(current->sym, sym)) {
     current  = current->next;
   }
@@ -85,13 +96,13 @@ int is_valid_token(const char *token) {
 }
 
 
-/* split str into array of tokens */
-char **tokenize(char **str, int *num_tokens) {
+/* split str into array of tokens and store them into tokenizer */
+void tokenize(struct tokenizer *t, char **str) {
   char *token;
   size_t tokens_len = 10; /* starting token length */
-  char **tokens = malloc(sizeof(char*) * tokens_len);
-  if(!tokens) {
-    fprintf(stderr, "malloc failed");
+  t->tokens = malloc(sizeof(char*) * tokens_len);
+  if(!t->tokens) {
+    perror("malloc failed");
     exit(1);
   }
 
@@ -102,63 +113,60 @@ char **tokenize(char **str, int *num_tokens) {
       /* when to increase tokens_len? */
       if(j >= tokens_len) {
         tokens_len *= 2;
-        tokens = realloc(tokens, sizeof(char*)*tokens_len);
-        if(!tokens) {
-          fprintf(stderr, "realloc failed");
+        t->tokens = realloc(t->tokens, sizeof(char*) * tokens_len);
+        if(!t->tokens) {
+          perror("realloc failed");
           exit(1);
         }
       }
-      tokens[j] = strdup(token);
-      if(!(tokens[j])) {
-        fprintf(stderr, "strdup(token) failed");
+      t->tokens[j] = strdup(token);
+      if(!(t->tokens[j])) {
+        perror("strdup(token) failed");
         exit(1);
       }
       j++;
     }
   }
-  *num_tokens = j;
-  
+  t->len = j; /* set number of tokens */
   free(s);
-  
-  return tokens;
 }
 
 /* recursive eval expression function to evaluate s-expr */
-int eval_expr(char **tokens, int num_tokens, int *pos) {
+int eval_expr(struct tokenizer *t, int *pos) {
   /* begging of s-expr */
-  if(strcmp(tokens[*pos], "(") == 0) {
+  if(strcmp(t->tokens[*pos], "(") == 0) {
     (*pos)++; /* skip '(' */
 
     /* s-expr operation */
-    const char *op = tokens[(*pos)++];
+    const char *op = t->tokens[(*pos)++];
     int res;
 
     if(strcmp(op, "+") == 0) {
       res = 0;
-      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
-        res += eval_expr(tokens, num_tokens, pos);
+      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
+        res += eval_expr(t, pos);
       }
     } else if(strcmp(op, "-") == 0) {
-      res = eval_expr(tokens, num_tokens, pos);
-      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
-        res -= eval_expr(tokens, num_tokens, pos);
+      res = eval_expr(t, pos);
+      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
+        res -= eval_expr(t, pos);
       }
     } else if(strcmp(op, "*") == 0) {
-      res = eval_expr(tokens, num_tokens, pos);
-      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
-        res *= eval_expr(tokens, num_tokens, pos);
+      res = eval_expr(t, pos);
+      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
+        res *= eval_expr(t, pos);
       }
     } else if(strcmp(op, "/") == 0) {
-      res = eval_expr(tokens, num_tokens, pos);
-      while(*pos < num_tokens && strcmp(tokens[(*pos)], ")") != 0) {
-        res /= eval_expr(tokens, num_tokens, pos);
+      res = eval_expr(t, pos);
+      while(*pos < t->len && strcmp(t->tokens[(*pos)], ")") != 0) {
+        res /= eval_expr(t, pos);
       }
     } else if(strcmp(op, "define") == 0) {
-      const char *sym = tokens[(*pos)++]; // get variable name
-      int val = atoi(tokens[(*pos)++]); // get variable value
+      const char *sym = t->tokens[(*pos)++]; // get variable name
+      int val = atoi(t->tokens[(*pos)++]); // get variable value
       define_variable(sym, val); // store variable in global environment
-      if(strcmp(tokens[(*pos)], ")") != 0) {
-        fprintf(stderr, "Expected ')'\n");
+      if(strcmp(t->tokens[(*pos)], ")") != 0) {
+        perror("Expected ')'\n");
         exit(1);
       }
     } else {
@@ -166,8 +174,8 @@ int eval_expr(char **tokens, int num_tokens, int *pos) {
       exit(1);
     }
 
-    if(*pos >= num_tokens || strcmp(tokens[*pos], ")") != 0) {
-      fprintf(stderr, "Expected ')'\n");
+    if(*pos >= t->len || strcmp(t->tokens[*pos], ")") != 0) {
+      perror("Expected ')'\n");
       exit(1);
     }
     
@@ -179,11 +187,11 @@ int eval_expr(char **tokens, int num_tokens, int *pos) {
   /* base case: s-expr arguments */
   else {
     char *endptr;
-    int val = strtol(tokens[*pos], &endptr, 10);
+    int val = strtol(t->tokens[*pos], &endptr, 10);
     if(*endptr != '\0') { // if token is a symbol
-      val = lookup_variable(tokens[*pos]);
+      val = lookup_variable(t->tokens[*pos]);
     } else {
-      val = atoi(tokens[*pos]);
+      val = atoi(t->tokens[*pos]);
     }
     (*pos)++;
     return val;
@@ -191,24 +199,27 @@ int eval_expr(char **tokens, int num_tokens, int *pos) {
 }
 
 /* eval function */
-int eval(char **tokens, int num_tokens) {
+int eval(struct tokenizer *t) {
   int pos = 0;
-  return eval_expr(tokens, num_tokens, &pos);
+  return eval_expr(t, &pos);
 }
 
 int main(int argc , char *argv[]) {
   char *line = NULL;
   size_t linecap = 0;
   ssize_t linelen;
-  char **tokens;
-  int num_tokens;
-
+  struct tokenizer t;
   int res = 0;
-  while((linelen = getline(&line, &linecap, stdin)) > 0) {
-    tokens = tokenize(&line, &num_tokens);
-    res = eval(tokens, num_tokens);
+
+  initTokenizer(&t);
+
+  while(1) {
+    printf("cscm> "); fflush(stdout); /* Prompt */
+    linelen = getline(&line, &linecap, stdin);
+    if(linelen <= 0) break; /* if we don't have any character or and error break */
+    tokenize(&t, &line);
+    res = eval(&t);
     printf("%d\n", res);
   }
-  
   return 0;
 }
