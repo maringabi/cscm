@@ -213,7 +213,7 @@ void eval(struct interpreter *i, struct tokenizer *t) {
   i->result = eval_expr(i, t);
 }
 
-int main(int argc , char *argv[]) {
+int main(void) {
   char *line = NULL;
   size_t linecap = 0;
   ssize_t linelen;
